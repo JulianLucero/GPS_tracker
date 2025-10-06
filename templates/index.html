@@ -1,43 +1,80 @@
 <!doctype html>
 <html lang="es">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GPS Live - Neo6M</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<style>html,body,#map{height:100%;margin:0;padding:0}</style>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>GPS Live - Neo6M</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        /* Estilo para que el mapa ocupe toda la ventana */
+        html,
+        body,
+        #map {
+            height: 100%;
+            margin: 0;
+            padding: 0
+        }
+    </style>
 </head>
 <body>
-<div id="map"></div>
+    <div id="map"></div>
 
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        // 1. Inicialización del Mapa
+        const map = L.map('map').setView([0,0], 2); // Vista inicial centrada en [0,0] con zoom 2
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
-const map = L.map('map').setView([0,0], 2);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-maxZoom: 19,
-attribution: '© OpenStreetMap contributors'
-}).addTo(map);
+        let marker = null; // Variable para almacenar el marcador actual
 
+        // 2. Función PRINCIPAL: Obtiene las coordenadas y actualiza el mapa
+        async function fetchCoords() {
+            try {
+                // Llama al endpoint de obtención de datos
+                const res = await fetch('/coordenadas/obtener');
+                const j = await res.json(); 
 
-let marker = null;
+                const lat = j.lat;
+                const lon = j.lon;
 
+                // CRÍTICO: Solo actualizar si hay coordenadas válidas
+                if (lat !== null && lon !== null) {
+                    const newLatLng = new L.LatLng(lat, lon);
 
- async function fetchCoords() {
-        try {
-            // const res = await fetch('/coordenadas'); // Línea original, ahora comentada
-            const res = await fetch('/coordenadas/obtener'); // Nueva ruta para obtener datos
-            const j = await res.json();
-            // ... resto del código
-        } catch (e) {
-            console.error('error fetching coords', e);
+                    // --- Lógica de actualización del marcador ---
+                    if (marker) {
+                        // Si el marcador existe, lo mueve a la nueva posición
+                        marker.setLatLng(newLatLng);
+                    } else {
+                        // Si no existe, lo crea
+                        marker = L.marker(newLatLng).addTo(map)
+                            .bindPopup(`Última ubicación: ${lat.toFixed(4)}, ${lon.toFixed(4)}<br>Hora GPS: ${j.time_gps}`)
+                            .openPopup();
+                        // Centrar la primera vez con un zoom más cercano
+                        map.setView(newLatLng, 13); 
+                    }
+                    
+                    // Asegura que el mapa se mueva a la nueva posición después de la primera vez
+                    map.panTo(newLatLng);
+                }
+
+            } catch (e) {
+                console.error('Error al obtener coordenadas:', e);
+            }
         }
-    }
 
+        // 3. Ejecución del Polling
+        // Llamada inicial para cargar la primera ubicación
+        fetchCoords(); 
+        // Llama a la función cada 2 segundos (2000 ms)
+        setInterval(fetchCoords, 2000);
 
-// Polling cada 2 segundos
-setInterval(fetchCoords, 2000);
-fetchCoords();
-</script>
+    </script>
 </body>
 </html>
